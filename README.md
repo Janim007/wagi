@@ -1,4 +1,8 @@
 wagi
 ====
 
-Wagi, Wordpress plugin to show most popular posts from Google analytics 
+Wagi, Wordpress plugin to show most popular posts from Google analytics
+
+
+How to install
+==============
