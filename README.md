@@ -17,7 +17,7 @@ How to install
 
 * make sure to add the redirect url as follows:
 
-*http://your-website-domain.com/your-wordpress-installation-folder-if-any/wp-admin/options-general.php?page=wagi_google_api_popular_Posts
+        http://your-website-domain.com/your-wordpress-installation-folder-if-any/wp-admin/options-general.php?page=wagi_google_api_popular_Posts
 
 * copy/page client Id, client Secret from your google console page, set them in plugin setting, click save credentioals
 
