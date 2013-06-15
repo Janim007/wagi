@@ -23,4 +23,11 @@ How to install
 
 * now you should see button called Click here to Authorize Google Analyitcs to use this plugin!
 
-* go to your dashboard and have fun
+* go to your dashboard, make your configurations
+
+* go to apperance > widgets place your widget
+
+
+note: results are cached in wordpress for 24 hours, clicking changing account or time period in dashboard will refresh a new cache, or just click refresh data.
+
+** have fun!
