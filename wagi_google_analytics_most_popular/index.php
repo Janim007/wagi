@@ -41,11 +41,16 @@
       *  first hit, start by addmin menu item hook
       */
      public function __construct() {
-         add_action( 'admin_menu', array( &$this, 'admin_setting' ) );
+
+        if(is_admin()) {
+            add_action( 'admin_menu', array( &$this, 'admin_setting' ) );
+        }
 
          if ( isset( $_GET[ 'wagi_reset' ] ) ) {
              $this->reset_options();
          }
+
+
 
      }
 
@@ -278,8 +283,8 @@
          {
              // raise http status error code as it's easer for jquery.ajax functon to handle
              if ( $is_ajax_request ) {
-                 http_response_code( 401 );
-                 return 1;
+                 header("HTTP/1.1 401 Authorization Required");                 
+                 return $e->getMessage();
              }
              else {
                  //echo sprintf( '<div class="error">Wagi: %s</div>', $e->getMessage() );
