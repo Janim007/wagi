@@ -44,14 +44,10 @@
 
         if(is_admin()) {
             add_action( 'admin_menu', array( &$this, 'admin_setting' ) );
-        }
-
-         if ( isset( $_GET[ 'wagi_reset' ] ) ) {
+            if ( isset( $_GET[ 'wagi_reset' ] ) ) {
              $this->reset_options();
-         }
-
-
-
+            }
+        }        
      }
 
      /**
