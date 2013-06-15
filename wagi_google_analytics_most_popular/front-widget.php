@@ -10,7 +10,7 @@
  * @link       https://github.com/Janim007/wagi
  * @since      Class available since Release 1.0
  */
-require_once dirname( __FILE__ ) . '/loader.php';
+
 class wagi_frond_widget extends WP_Widget {
 
   /**
@@ -83,8 +83,10 @@ class wagi_frond_widget extends WP_Widget {
 /**
  * hook the widget
  */
-add_action( 'widgets_init', function() {
+add_action( 'widgets_init',  'wagi_register_widget');
+
+function wagi_register_widget() {
     register_widget( 'wagi_frond_widget' );
-  } );
+  }
 
 ?>
