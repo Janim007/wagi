@@ -35,7 +35,7 @@
       */
      public function dashboard_widgets_content() {
 
-         $options = get_option( self::OPTION_KEY, $default = false );
+         $options = $this->options;
 
          // get account form cache, if not ask google for them
          $accounts = get_transient( self::ACCOUNTS_CACHE );

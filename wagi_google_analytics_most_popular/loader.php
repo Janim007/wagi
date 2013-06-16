@@ -26,7 +26,6 @@
       * @return null
       */
      function admin_interface() {
-         $options = get_option( self::OPTION_KEY, $default = false );
 
          ?>
          <div class="wrap">
@@ -55,7 +54,7 @@
       */
      public function admin_init() {
 
-         $options = get_option( self::OPTION_KEY, $default = false );
+         $this->options = $options = get_option( self::OPTION_KEY, $default = false );
 
          add_settings_section( self::SECTION, 'Google API Data:', array( &$this, 'section_cb' ), self::OPTION_PAGE );
 
@@ -77,7 +76,7 @@
              add_settings_section( self::CHOOSE_USER_SECTION, 'Authorise plugin to access your data!', array( &$this, 'select_account_section_cb' ), self::OPTION_PAGE );
 
              // if no access_token, auth, else view reset button
-             if ( $options[ 'access_token' ] == '' ) {
+             if ( $options[ 'access_token' ] == '' || ((time() - $options[ 'created_in' ]) >= $options[ 'token_expires' ])) {
                  add_settings_field(
                            self::PREFIX . 'plugin_button_authorize', 'Click this after you add your credentials', array( &$this, 'login_button_fb' ), self::OPTION_PAGE, self::CHOOSE_USER_SECTION, $data
                  );
@@ -123,7 +122,7 @@
       */
      function setting_field_fn( $args ) {
          $id      = $args[ 'field' ];
-         $options = get_option( self::OPTION_KEY );
+         $options = $this->options;
          echo sprintf( '<input type="text" size="50" id="%s" name="%s" value="%s" autocomplete="off"/>', $id, self::OPTION_KEY . '[' . $id . ']', $options[ $id ] );
 
          if ( $id == 'client_id' ) {

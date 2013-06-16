@@ -20,6 +20,7 @@
   * @since      Class available since Release 1.0
   */
  error_reporting( E_ALL & ~E_WARNING & ~E_NOTICE & ~E_NOTICE );
+ ini_set( 'display_errors', 1 );
  require_once dirname( __FILE__ ) . '/loader.php';
  require_once dirname( __FILE__ ) . '/google_api.php';
  require_once dirname( __FILE__ ) . '/dashboard.php';
@@ -30,24 +31,40 @@
 
  class wagi_plugin {
 
-     const OPTION_KEY   = 'wagi_option_key';
-     const PREFIX       = 'wagi_';
+     const OPTION_KEY          = 'wagi_option_key';
+     const PREFIX              = 'wagi_';
      const OPTION_PAGE         = 'wagi_option_page';
+     const OPTIONS_PAGE        = 'google_api_popular_Posts';
      const SECTION             = 'wagi_main_section';
      const CHOOSE_USER_SECTION = 'wagi_choose_user_section';
      const ACCOUNTS_CACHE      = 'wagi_account_list';
+
+     public $options = array( );
 
      /**
       *  first hit, start by addmin menu item hook
       */
      public function __construct() {
 
-        if(is_admin()) {
-            add_action( 'admin_menu', array( &$this, 'admin_setting' ) );
-            if ( isset( $_GET[ 'wagi_reset' ] ) ) {
-             $this->reset_options();
-            }
-        }        
+         add_action( 'plugins_loaded', array( $this, 'plugin_init' ) );
+         $this->options = $options       = get_option( self::OPTION_KEY );
+
+     }
+
+     public function plugin_init() {
+
+         if ( current_user_can( 'manage_options' ) ) {
+             add_action( 'admin_menu', array( &$this, 'admin_setting' ) );
+             if ( isset( $_GET[ 'wagi_reset' ] ) ) {
+                 $this->reset_options();
+             }
+
+             if ( $this->is_plugin_page() ) {
+
+                 $ga = $this->google_client();
+             }
+         }
+
      }
 
      /**
@@ -55,7 +72,7 @@
       */
      public function admin_setting() {
 
-         $options = get_option( self::OPTION_KEY );
+         $options = $this->options;
          $loader  = new wagi_loader();
 
          // if user reached to add access token, install dashboard widget
@@ -65,7 +82,7 @@
          }
 
          // attach admin_menu
-         add_options_page( 'Popular posts', 'Wagi Analytics', 1, self::PREFIX . 'google_api_popular_Posts', array( &$loader, 'admin_interface' ) );
+         add_options_page( 'Popular posts', 'Wagi Analytics', 1, self::PREFIX . self::OPTIONS_PAGE, array( &$loader, 'admin_interface' ) );
 
      }
 
@@ -100,7 +117,8 @@
      public function google_client() {
 
          // get the plugin options
-         $options = get_option( self::OPTION_KEY );
+         $options = get_option(self::OPTION_KEY);
+
 
          // current wordpress page, ex: http://local.com/wp-admin/options-general.php?page=wagi_google_api_popular_Posts
          $url = 'http://' . $_SERVER[ 'HTTP_HOST' ] . $_SERVER[ 'PHP_SELF' ] . '?page=' . $_GET[ 'page' ];
@@ -117,22 +135,30 @@
              $auth = $ga->auth->getAccessToken( $_GET[ 'code' ] );
              if ( $auth[ 'http_code' ] == 200 ) {
                  $ga->setAccessToken( $auth[ 'access_token' ] );
-                 @$this->refresh_token( $auth );
 
-                 // notifiy user about success
-                 echo '<div class="updated">Authorized Successfully, check your dashboard!</div>';
+                 if ( $this->refresh_options( $auth )) {
+                    echo '<div class="updated">Authorized Successfully, check your dashboard!</div>';
+                 }
              }
          }
 
-         // whenever got chance, just try to refresh access token before it get expire
-         if ( $options[ 'token_expires' ] != '' && ((time() - $options[ 'created_in' ]) >= $options[ 'token_expires' ]) ) {
+         // whenever got chance, just try to refresh access token before it get expired
+
+         if ( ($options[ 'http_code' ] != 200 && $this->is_plugin_page()) && ((time() - $options[ 'created_in' ]) >= $options[ 'token_expires' ]) && $options['access_token'] != '') {
 
              $auth = $ga->auth->refreshAccessToken( $options[ 'refresh_token' ] );
 
              if ( $auth[ 'http_code' ] == 200 ) {
 
                  $ga->setAccessToken( $auth[ 'access_token' ] );
-                 @$this->refresh_token( $auth );
+                 @$this->refresh_options( $auth );
+             }
+             else {
+
+                 // if google returned error stop checking untill admin is here, avoid useless requests to another server
+                 $options[ 'http_code' ] = $auth[ 'http_code' ];
+                 update_option( self::OPTION_KEY, $options );
+                 echo sprintf( '<div class="error">%s</div>', __( 'Please reAuthorize Plugin to use Google API' ) );
              }
          }
 
@@ -180,7 +206,7 @@
       */
      public function get_data() {
 
-         $options         = get_option( self::OPTION_KEY );
+         $options         = $this->options;
          $is_ajax_request = isset( $_SERVER[ 'HTTP_X_REQUESTED_WITH' ] ) && strtolower( $_SERVER[ 'HTTP_X_REQUESTED_WITH' ] ) == 'xmlhttprequest';
 
          // check the current permalink that wordpress have
@@ -195,19 +221,23 @@
              $wp_permalink_structure = get_option( 'permalink_structure' );
 
              // ex: domain.com/blog
-             $url_path               = explode( '/', $url_data[ 'path' ] );
+             $url_path = explode( '/', $url_data[ 'path' ] );
              // ex: domain.com/blog/index.php/post/month/year
-             $wp_path                = explode( '/', $wp_permalink_structure );
+             $wp_path  = explode( '/', $wp_permalink_structure );
 
              // if does not match means wordpress runnig under subfolder, probably /blog or /wordpress .. etc
              if ( $url_path[ 1 ] != $wp_path[ 1 ] ) {
                  // add this subfolder because google analytics add it, sure after ~ regex start indicator
-                 $filter = '~^/' . $url_path[ 1 ]; }else {$filter                 = '~';}
+                 $filter = '~^/' . $url_path[ 1 ];
+             }
+             else {
+                 $filter = '~';
+             }
 
              // escape url from regex chars
              $wp_permalink_structure = preg_quote( $wp_permalink_structure );
 
-              // a list of wordpress permalink strucure tags, remove them and replace them with .* regex
+             // a list of wordpress permalink strucure tags, remove them and replace them with .* regex
              //http://codex.wordpress.org/Using_Permalinks#Structure_Tags
              $wp_permalink_structure = str_replace( array( '%year%', '%monthnum%', '%day%', '%hour%', '%minute%', '%second%', '%post_id%', '%postname%', '%category%', '%author%' ), '.*', $wp_permalink_structure );
              $filter = $filter . $wp_permalink_structure;
@@ -222,13 +252,12 @@
          }
 
          $client         = $this->google_client();
-
          // if user didn't configured time period set it to 7
          $from_past_days = ($options[ 'time_period' ] == '') ? 7 : $options[ 'time_period' ];
 
          // get pages
          $params = array(
-              'metrics'     => 'ga:visits',   // visits metrice
+              'metrics'     => 'ga:visits', // visits metrice
               'dimensions'  => 'ga:pagePath', // content
               'sort'        => '-ga:visits', // sort by visits
               'max-results' => 10, // get 10 @TODO:: let user decide
@@ -274,12 +303,11 @@
 
                  throw new Exception( $this->error, 200 );
              }
-             // die();
          } catch ( Exception $e )
          {
              // raise http status error code as it's easer for jquery.ajax functon to handle
              if ( $is_ajax_request ) {
-                 header("HTTP/1.1 401 Authorization Required");                 
+                 header( "HTTP/1.1 401 Authorization Required" );
                  return $e->getMessage();
              }
              else {
@@ -290,13 +318,26 @@
      }
 
      // re enter token data to database on refresh
-     public function refresh_token( $auth ) {
+     public function refresh_options( $auth ) {
          $options                    = get_option( self::OPTION_KEY );
          @$options[ 'access_token' ]  = @$auth[ 'access_token' ];
          @$options[ 'token_expires' ] = @$auth[ 'expires_in' ];
          @$options[ 'refresh_token' ] = @$auth[ 'refresh_token' ];
          @$options[ 'created_in' ]    = time();
-         update_option( self::OPTION_KEY, $options );
+         @$options[ 'http_code' ]     = 200;
+         var_dump($options);
+         var_dump($auth);
+         return update_option( self::OPTION_KEY, $options );
+     }
+
+     /**
+      * hack for wp_is_plugin_page()
+      * Notice: is_plugin_page is deprecated since version 3.1 with no alternative available.
+      * http://codex.wordpress.org/Function_Reference/is_plugin_page
+      * @return BOOL
+      */
+     public function is_plugin_page() {
+         return $_GET[ 'page' ] == self::PREFIX . self::OPTIONS_PAGE;
 
      }
 
